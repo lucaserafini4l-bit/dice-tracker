@@ -1,9 +1,4 @@
 # dice-tracker
-Ecco una bozza per il file `README.md` per il tuo progetto su GitHub. È strutturata per essere chiara, professionale e leggibile, ideale per documentare un'analisi statistica.
-
-Puoi copiare e incollare questo contenuto direttamente nel file `README.md` della tua repository.
-
------
 
 # Analisi Statistica — Gioco dei Dadi
 
@@ -26,11 +21,10 @@ L'analisi probabilistica definisce una "soglia critica" basata sul valore atteso
 
 ### Regole Operative
 
-1.  **Soglia universale:** Rilancia qualsiasi dado che mostra 3, 5 o 6. Tieni i dadi con 0, 1 o 2.
+1.  **Soglia universale:** Rilancia qualsiasi dado che mostra 3, 5 o 6. Tieni i dadi con 0 o 1.
 2.  **Primo lancio:**
-      - Se tutti i dadi mostrano ≤ 2: **FERMATI**.
-      - Se uno o più dadi mostrano ≥ 3: tieni i valori ≤ 2 e rilancia gli altri.
-3.  **Caso 2+2+2:** Anche se i dadi sono "alla media", la scelta statisticamente migliore è fermarsi (EV 6).
+      - Se tutti i dadi mostrano ≤ 1: **FERMATI**.
+      - Se uno o più dadi mostrano ≥ 3: tieni i valori ≤ 1 e rilancia gli altri.
 
 ## 📊 Dati e Statistiche
 
