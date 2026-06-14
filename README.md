@@ -57,9 +57,3 @@ L'analisi si basa su **145 turni reali** raccolti tra il 19/03/2026 e il 27/03/2
 -----
 
 *Analisi basata su 145 turni reali e calcolo probabilistico esatto su 216 combinazioni.*
-
------
-
-### Suggerimento per il tuo prossimo passo:
-
-Se hai bisogno di generare una tabella specifica o un grafico per includerlo nel repository, posso aiutarti a riassumere i dati o creare un piccolo script (es. Python) per calcolare le probabilità se volessi automatizzare l'analisi in futuro. **Vuoi che ti aiuti a scrivere uno script per simulare queste probabilità?**
