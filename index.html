@@ -478,7 +478,7 @@ const GameScreen = ({ players, rounds, stake, onNewRound, onEditRound }) => {
 };
 
 // ─── Screen: New Round Sheet ──────────────────────────────────
-const NewRoundSheet = ({ players, roundNum, stake, onConfirm, onClose, editRound=null }) => {
+const NewRoundSheet = ({ players, roundNum, stake, onConfirm, onClose, editRound=null, lastWinnerId=null }) => {
   const [diceValues, setDiceValues] = useState(() => {
     if (editRound) return Object.fromEntries(editRound.results.map(r=>[r.pid, r.dice]));
     return Object.fromEntries(players.map(p=>[p.id,0]));
@@ -597,6 +597,19 @@ const NewRoundSheet = ({ players, roundNum, stake, onConfirm, onClose, editRound
 
           {step === 'dice' && (
             <>
+              {/* Winner goes first banner */}
+              {!editRound && lastWinnerId && (
+                <div style={{
+                  display:'flex', alignItems:'center', gap:8,
+                  padding:'8px 14px', marginBottom:12,
+                  background:'rgba(212,175,55,0.1)', borderRadius:8,
+                  border:'0.5px solid rgba(212,175,55,0.25)',
+                  fontSize:12, color:'#D4AF37', fontWeight:600,
+                }}>
+                  <span>🏆</span>
+                  <span>{players.find(p=>p.id===lastWinnerId)?.name} inizia per primo</span>
+                </div>
+              )}
               {/* Auto-roll */}
               <Btn variant="secondary" onClick={handleRoll} style={{width:'100%', marginBottom:16}}>
                 Lancia random
@@ -604,15 +617,21 @@ const NewRoundSheet = ({ players, roundNum, stake, onConfirm, onClose, editRound
 
               {/* Per-player dice */}
               <div style={{display:'flex', flexDirection:'column', gap:12}}>
-                {players.map(p => (
+                {players.map((p, idx) => (
                   <div key={p.id} style={{
                     display:'flex', alignItems:'center', justifyContent:'space-between',
                     background:T.surface, borderRadius:12, padding:'12px 16px',
-                    border:`0.5px solid ${T.border}`,
+                    border:`0.5px solid ${idx===0 && !editRound && lastWinnerId ? 'rgba(212,175,55,0.3)' : T.border}`,
                   }}>
                     <div style={{display:'flex', alignItems:'center', gap:10}}>
                       <div style={{width:3, height:36, borderRadius:2, background:p.color, flexShrink:0}}/>
                       <span style={{fontSize:16, fontWeight:600}}>{p.name}</span>
+                      {idx===0 && !editRound && lastWinnerId && (
+                        <span style={{
+                          fontSize:10, padding:'2px 7px', borderRadius:99,
+                          background:'rgba(212,175,55,0.15)', color:'#D4AF37', fontWeight:700,
+                        }}>1°</span>
+                      )}
                     </div>
                     <div style={{display:'flex', alignItems:'center', gap:10}}>
                       <DieFace key={`${animKey}-${p.id}`} value={diceValues[p.id]} size={34} animated={animKey>0}/>
@@ -1092,8 +1111,74 @@ const ProfileScreen = ({ players }) => {
 };
 
 // ─── Screen: Settings ─────────────────────────────────────────
-const SettingsScreen = ({ players, stake, onStakeChange, onAddPlayer, onRemovePlayer, onReset }) => {
+const SettingsScreen = ({ players, stake, onStakeChange, onAddPlayer, onRemovePlayer, onReset, onReorderPlayers }) => {
   const [newName, setNewName] = useState('');
+
+  // ─── Drag-to-reorder ──────────────────────────────────────
+  const [dragVisual, setDragVisual] = useState({ from: null, over: null });
+  const dragFromRef = useRef(null);
+  const dragOverRef = useRef(null);
+  const dragActiveRef = useRef(false);
+  const playerRefs = useRef([]);
+  const playersRef = useRef(players);
+  const reorderRef = useRef(onReorderPlayers);
+  useEffect(() => { playersRef.current = players; }, [players]);
+  useEffect(() => { reorderRef.current = onReorderPlayers; }, [onReorderPlayers]);
+
+  const getOverIndex = (clientY) => {
+    for (let i = 0; i < playerRefs.current.length; i++) {
+      const el = playerRefs.current[i];
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (clientY >= rect.top && clientY <= rect.bottom) return i;
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!dragActiveRef.current) return;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const over = getOverIndex(clientY);
+      if (over !== null && over !== dragOverRef.current) {
+        dragOverRef.current = over;
+        setDragVisual(prev => ({ ...prev, over }));
+      }
+    };
+    const onEnd = () => {
+      if (!dragActiveRef.current) return;
+      dragActiveRef.current = false;
+      const from = dragFromRef.current;
+      const over = dragOverRef.current;
+      dragFromRef.current = null;
+      dragOverRef.current = null;
+      setDragVisual({ from: null, over: null });
+      if (from !== null && over !== null && from !== over) {
+        const ps = [...playersRef.current];
+        const [moved] = ps.splice(from, 1);
+        ps.splice(over, 0, moved);
+        reorderRef.current(ps.map(p => p.id));
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onEnd);
+    window.addEventListener('touchmove', onMove);
+    window.addEventListener('touchend', onEnd);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onEnd);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onEnd);
+    };
+  }, []);
+
+  const startDrag = (index) => {
+    dragFromRef.current = index;
+    dragOverRef.current = index;
+    dragActiveRef.current = true;
+    setDragVisual({ from: index, over: index });
+  };
+  // ─────────────────────────────────────────────────────────
 
   return (
     <div style={{padding:'0 16px', paddingBottom:100, animation:'slide-up 0.3s ease'}}>
@@ -1123,26 +1208,48 @@ const SettingsScreen = ({ players, stake, onStakeChange, onAddPlayer, onRemovePl
       {/* Players */}
       <Label style={{display:'block', marginBottom:8}}>Giocatori ({players.length}/6)</Label>
       <div style={{display:'flex', flexDirection:'column', gap:6, marginBottom:12}}>
-        {players.map((p, i) => (
-          <div key={p.id} style={{
-            display:'flex', alignItems:'center', gap:10,
-            background:T.surface, borderRadius:10, padding:'10px 14px',
-            border:`0.5px solid ${T.border}`,
-          }}>
-            <div style={{width:3, height:24, borderRadius:2, background:p.color}}/>
-            <span style={{flex:1, fontSize:15, fontWeight:600}}>{p.name}</span>
-            <span style={{fontSize:12, color: p.balance>=0?T.green:T.red, fontVariantNumeric:'tabular-nums'}}>
-              {p.balance>=0?'+':''}{p.balance.toFixed(2)}
-            </span>
-            {players.length > 2 && (
-              <button onClick={() => onRemovePlayer(p.id)} style={{
-                width:32, height:32, borderRadius:6, background:T.redDim,
-                border:`0.5px solid ${T.red}22`, color:T.red,
-                cursor:'pointer', fontSize:16, display:'flex', alignItems:'center', justifyContent:'center',
-              }}>×</button>
-            )}
-          </div>
-        ))}
+        {players.map((p, i) => {
+          const isDragging = dragVisual.from === i;
+          const isOver = dragVisual.over === i && dragVisual.from !== null && dragVisual.from !== i;
+          return (
+            <div
+              key={p.id}
+              ref={el => playerRefs.current[i] = el}
+              style={{
+                display:'flex', alignItems:'center', gap:10,
+                background: isOver ? T.goldDim : T.surface,
+                borderRadius:10, padding:'10px 14px',
+                border:`0.5px solid ${isOver ? 'rgba(212,175,55,0.4)' : T.border}`,
+                opacity: isDragging ? 0.4 : 1,
+                transition:'background 0.1s, border-color 0.1s, opacity 0.1s',
+                transform: isOver ? 'translateY(-2px)' : 'none',
+              }}
+            >
+              {/* Drag handle */}
+              <div
+                onMouseDown={() => startDrag(i)}
+                onTouchStart={(e) => { e.preventDefault(); startDrag(i); }}
+                style={{
+                  cursor:'grab', color: T.muted, fontSize:18, lineHeight:1,
+                  userSelect:'none', WebkitUserSelect:'none',
+                  padding:'0 2px', touchAction:'none', flexShrink:0,
+                }}
+              >⠿</div>
+              <div style={{width:3, height:24, borderRadius:2, background:p.color, flexShrink:0}}/>
+              <span style={{flex:1, fontSize:15, fontWeight:600}}>{p.name}</span>
+              <span style={{fontSize:12, color: p.balance>=0?T.green:T.red, fontVariantNumeric:'tabular-nums'}}>
+                {p.balance>=0?'+':''}{p.balance.toFixed(2)}
+              </span>
+              {players.length > 2 && (
+                <button onClick={() => onRemovePlayer(p.id)} style={{
+                  width:32, height:32, borderRadius:6, background:T.redDim,
+                  border:`0.5px solid ${T.red}22`, color:T.red,
+                  cursor:'pointer', fontSize:16, display:'flex', alignItems:'center', justifyContent:'center',
+                }}>×</button>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {players.length < 6 && (
@@ -1275,6 +1382,21 @@ const App = () => {
     setBasePlayers(prev => prev.filter(p=>p.id!==id));
     setRounds(prev => prev.map(r => ({...r, results: r.results.filter(res=>res.pid!==id)})));
   };
+
+  const handleReorderPlayers = (newOrderIds) => {
+    setBasePlayers(prev => newOrderIds.map(id => prev.find(p => p.id === id)).filter(Boolean));
+  };
+
+  // Ordine per il prossimo round: vincitore dell'ultimo round per primo, poi ordine config
+  const playersForNextRound = (() => {
+    if (rounds.length === 0) return players;
+    const lastRound = rounds[rounds.length - 1];
+    const winner = getRoundWinner(lastRound, players);
+    if (!winner) return players;
+    return [winner, ...players.filter(p => p.id !== winner.id)];
+  })();
+
+  const lastWinnerId = rounds.length > 0 ? getRoundWinner(rounds[rounds.length - 1], players)?.id : null;
 
   const handleReset = () => {
     if (rounds.length === 0) { alert('Nessuna partita da salvare.'); return; }
@@ -1412,19 +1534,20 @@ const App = () => {
         {screen==='game' && <GameScreen players={players} rounds={rounds} stake={stake} onNewRound={()=>setShowNewRound(true)} onEditRound={setEditRound}/>}
         {screen==='stats' && <StatsScreen players={players} rounds={rounds} onEditRound={setEditRound}/>}
         {screen==='profile' && <ProfileScreen players={players}/>}
-        {screen==='settings' && <SettingsScreen players={players} stake={stake} onStakeChange={setStake} onAddPlayer={handleAddPlayer} onRemovePlayer={handleRemovePlayer} onReset={handleReset}/>}
+        {screen==='settings' && <SettingsScreen players={players} stake={stake} onStakeChange={setStake} onAddPlayer={handleAddPlayer} onRemovePlayer={handleRemovePlayer} onReset={handleReset} onReorderPlayers={handleReorderPlayers}/>}
       </div>
 
       <BottomNav active={screen} onChange={setScreen}/>
 
       {(showNewRound || editRound) && (
         <NewRoundSheet
-          players={players}
+          players={editRound ? players : playersForNextRound}
           roundNum={rounds.length+1}
           stake={stake}
           onConfirm={editRound ? handleEditRoundConfirm : handleNewRound}
           onClose={()=>{ setShowNewRound(false); setEditRound(null); }}
           editRound={editRound}
+          lastWinnerId={editRound ? null : lastWinnerId}
         />
       )}
 
